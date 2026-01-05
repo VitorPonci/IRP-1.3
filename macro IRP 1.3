@@ -1,0 +1,110 @@
+Sub AtualizarProporcaoPMCRP()
+
+    Dim wsFonte As Worksheet, wsDestino As Worksheet
+    Dim ultimaLinha As Long, linhaAtual As Long, linhaDestino As Long
+    Dim anoAtual As Variant
+    Dim estadosPMCRP As Variant
+    Dim numEstados As Long
+    Dim prodGeral As Double, prodPMCRP As Double
+    Dim prodEstado() As Double
+    Dim i As Long
+    Dim nomeUF As String
+    Dim diasAno As Long
+    Dim prodGeralDia As Double
+
+    Set wsFonte = ThisWorkbook.Sheets("Produção por Estado")
+    Set wsDestino = ThisWorkbook.Sheets("Graficos")
+
+    estadosPMCRP = Array("Rio de Janeiro", "Espírito Santo", "São Paulo", "Santa Catarina")
+    numEstados = UBound(estadosPMCRP) - LBound(estadosPMCRP) + 1
+    ReDim prodEstado(1 To numEstados)
+
+    ultimaLinha = wsFonte.Cells(wsFonte.Rows.Count, 1).End(xlUp).Row
+
+    ' Limpa valores antigos no template (C:L) a partir da linha 6
+    wsDestino.Range("C6:L1000").ClearContents
+
+    linhaDestino = 6
+    linhaAtual = 2
+
+    Do While linhaAtual <= ultimaLinha
+
+        anoAtual = wsFonte.Cells(linhaAtual, 1).Value
+
+        prodPMCRP = 0
+        prodGeral = 0
+        For i = 1 To numEstados
+            prodEstado(i) = 0
+        Next i
+
+        ' Percorre bloco do ano até achar "Total Geral"
+        Do While linhaAtual <= ultimaLinha _
+            And wsFonte.Cells(linhaAtual, 1).Value = anoAtual _
+            And Trim(LCase(wsFonte.Cells(linhaAtual, 2).Value)) <> "total geral"
+
+            nomeUF = Trim(wsFonte.Cells(linhaAtual, 2).Value)
+
+            For i = 1 To numEstados
+                If nomeUF = estadosPMCRP(i - 1) Then
+                    prodEstado(i) = prodEstado(i) + Val(wsFonte.Cells(linhaAtual, 5).Value)
+                    prodPMCRP = prodPMCRP + Val(wsFonte.Cells(linhaAtual, 5).Value)
+                    Exit For
+                End If
+            Next i
+
+            linhaAtual = linhaAtual + 1
+        Loop
+
+        ' Linha "Total Geral"
+        If linhaAtual <= ultimaLinha _
+            And wsFonte.Cells(linhaAtual, 1).Value = anoAtual _
+            And Trim(LCase(wsFonte.Cells(linhaAtual, 2).Value)) = "total geral" Then
+
+            prodGeral = Val(wsFonte.Cells(linhaAtual, 5).Value)
+
+            ' boe/d a partir do total anual (boe)
+            diasAno = DateSerial(CLng(anoAtual) + 1, 1, 1) - DateSerial(CLng(anoAtual), 1, 1)
+            If diasAno > 0 Then
+                prodGeralDia = prodGeral / diasAno
+            Else
+                prodGeralDia = 0
+            End If
+
+            ' Preenche valores
+            wsDestino.Cells(linhaDestino, "C").Value = anoAtual      ' Ano
+            wsDestino.Cells(linhaDestino, "D").Value = prodGeralDia  ' Produção Total (boe/d)
+            wsDestino.Cells(linhaDestino, "E").Value = prodGeral     ' Produção Total (boe)
+            wsDestino.Cells(linhaDestino, "F").Value = prodPMCRP     ' Produção Total PMCRP (boe)
+
+            ' Percentuais
+            If prodGeral > 0 Then
+                wsDestino.Cells(linhaDestino, "G").Value = prodPMCRP / prodGeral  ' % produção total (PMCRP)
+                wsDestino.Cells(linhaDestino, "H").Value = prodPMCRP / prodGeral  ' Proporção PMCRP (%)
+
+                wsDestino.Cells(linhaDestino, "I").Value = prodEstado(1) / prodGeral ' RJ
+                wsDestino.Cells(linhaDestino, "J").Value = prodEstado(2) / prodGeral ' ES
+                wsDestino.Cells(linhaDestino, "K").Value = prodEstado(3) / prodGeral ' SP
+                wsDestino.Cells(linhaDestino, "L").Value = prodEstado(4) / prodGeral ' SC
+            Else
+                wsDestino.Range("G" & linhaDestino & ":L" & linhaDestino).Value = 0
+            End If
+
+            ' === Formatação correta por bloco ===
+            wsDestino.Cells(linhaDestino, "C").NumberFormat = "0"              ' Ano
+            wsDestino.Cells(linhaDestino, "D").NumberFormat = "#,##0.000"      ' boe/d (número)
+            wsDestino.Cells(linhaDestino, "E").NumberFormat = "#,##0"          ' boe (número)
+            wsDestino.Cells(linhaDestino, "F").NumberFormat = "#,##0"          ' boe (número)
+
+            wsDestino.Range("G" & linhaDestino & ":L" & linhaDestino).NumberFormat = "0.00%" ' percentuais
+
+            linhaDestino = linhaDestino + 1
+            linhaAtual = linhaAtual + 1  ' pula a linha do Total Geral
+        Else
+            linhaAtual = linhaAtual + 1
+        End If
+
+    Loop
+
+    MsgBox "Proporção PMCRP atualizada com sucesso!"
+
+End Sub
